@@ -1,0 +1,1 @@
+# Attearnings - Calculate the roller coaster daily earnings
