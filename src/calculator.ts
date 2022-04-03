@@ -71,10 +71,10 @@ class Queue {
     const g = await getGroups();
     let currGroupPos = 0;
     let cycleStart = -1;
-    let map: Map<number, number> = new Map();
+    let map: Map<number, null> = new Map();
     let isRideFilled = false;
     while (map.get(currGroupPos) === undefined) {
-      map.set(currGroupPos, currGroupPos);
+      map.set(currGroupPos, null);
       let currPos = currGroupPos;
       let currSum = BigInt(0);
       let currEl = BigInt(g[currPos]);
