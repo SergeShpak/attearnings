@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "make-pretty": "npx prettier --write .",
     "test:unit": "nyc --all --exclude '**/*.test.[tj]s' mocha --config .mocharc.json --exclude 'src/e2e-tests/**/*.test.ts' 'src/**/*.test.ts'",
     "test:fs": "nyc --all --exclude '**/*.test.[tj]s' mocha --config .mocharc.json 'src/tests/fs-tests/*.test.ts'",
     "test:all": "nyc --all --exclude '**/*.test.[tj]s' mocha --config .mocharc.json 'src/**/*.test.ts'",
@@ -28,6 +29,7 @@
     "chai": "^4.3.6",
     "mocha": "^9.2.2",
     "nyc": "^15.1.0",
+    "prettier": "2.6.2",
     "ts-node": "^10.7.0",
     "typescript": "^4.6.3"
   },

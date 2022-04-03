@@ -63,3 +63,11 @@ npm run test:all
 ### Short explanation
 
 Groups that take a ride together can be regarded as a node. The nodes take rides always in the same order. In a general case, the nodes taking rides will sooner or later create a cycle - by finding its length and the number of people inside each node we can calculate the final result.
+
+### Misc
+
+We use `prettier` to format the code. To make your code pretty(ier?) run:
+
+```bash
+npm run make-pretty
+```

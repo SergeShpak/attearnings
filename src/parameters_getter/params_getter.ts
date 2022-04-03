@@ -1,5 +1,5 @@
-import { Parameters } from "../params"
+import { Parameters } from "../params";
 
 export interface ParamsGetter<T> {
-    GetParams(option: T): Promise<Parameters>
+  GetParams(option: T): Promise<Parameters>;
 }
