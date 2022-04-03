@@ -40,6 +40,23 @@ Or you can read the input data from stdin:
 cat src/tests/fs-tests/samples/1_simple_case.7.txt | node src/main.js
 ```
 
+#### Running with docker
+
+To run the code from a container build it first:
+
+```bash
+docker build -t "attearnings:1.0.0" .
+```
+
+Then mount the samples directory and run the code: 
+
+```bash
+docker run --rm \
+    -v "$(pwd)/src/tests/fs-tests/samples":"/attearnings/samples" \
+    attearnings:1.0.0 \
+    bash -c "node /attearnings/src/main.js -f /attearnings/samples/1_simple_case.7.txt"
+```
+
 ### Running the tests
 
 To run unit tests execute:
