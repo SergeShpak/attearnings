@@ -1,148 +1,130 @@
-import { resolve } from "path";
 import { Parameters } from "./params";
 
 export class Calculator {
   static async CalculateEarnings(param: Parameters): Promise<BigInt> {
-    const queue = new Queue();
-    await queue.construct(
-      param.group,
+    const groups = await Calculator.getGroups(param.group);
+    return EarningsCalculator.Calculate(
+      groups,
       param.numberOfPlaces,
       param.numberOfRides
     );
-    return new Promise<BigInt>((resolve, _) => {
-      if (queue.Head === null) {
-        return resolve(queue.StartTotal);
+  }
+
+  private static async getGroups(
+    groupsIterator: AsyncIterator<number, null | Error, void>
+  ): Promise<number[]> {
+    return new Promise<number[]>(async (resolve, _) => {
+      let groupStep = await groupsIterator.next();
+      let g: number[] = [];
+      while (!groupStep.done) {
+        g.push(groupStep.value);
+        groupStep = await groupsIterator.next();
       }
-      const fullCycles = Math.floor(
-        (param.numberOfRides - queue.StartLength) / queue.Length
-      );
-      const partialCycleLen =
-        param.numberOfRides - queue.StartLength - fullCycles * queue.Length;
-      return resolve(
-        queue.StartTotal +
-          queue.Total * BigInt(fullCycles) +
-          queue.countPartialSum(partialCycleLen)
-      );
+      return resolve(g);
     });
   }
 }
 
-class Queue {
-  StartLength: number;
-  StartTotal: bigint;
+class RideSum {
+  idx: number;
+  sum: bigint;
 
-  Head: QueueNode | null;
-  Total: bigint;
-  Length: number;
-
-  constructor() {
-    this.StartLength = 0;
-    this.StartTotal = BigInt(0);
-    this.Head = null;
-    this.Total = BigInt(0);
-    this.Length = 0;
-  }
-
-  async construct(
-    groups: AsyncIterator<number, null | Error, void>,
-    placesCount: number,
-    ridesCount: number
-  ) {
-    const getGroups = async (): Promise<number[]> => {
-      return new Promise<number[]>(async (resolve, _) => {
-        let groupStep = await groups.next();
-        let g: number[] = [];
-        while (!groupStep.done) {
-          g.push(groupStep.value);
-          groupStep = await groups.next();
-        }
-        return resolve(g);
-      });
-    };
-
-    this.Head = new QueueNode(-1, BigInt(0));
-    this.Length = 0;
-    this.Total = BigInt(0);
-    this.StartLength = 0;
-    this.StartTotal = BigInt(0);
-
-    let currNode: QueueNode | null = this.Head;
-
-    const g = await getGroups();
-    let currGroupPos = 0;
-    let cycleStart = -1;
-    let map: Map<number, null> = new Map();
-    let isRideFilled = false;
-    while (map.get(currGroupPos) === undefined) {
-      map.set(currGroupPos, null);
-      let currPos = currGroupPos;
-      let currSum = BigInt(0);
-      let currEl = BigInt(g[currPos]);
-      while (currSum + currEl <= placesCount) {
-        currSum += currEl;
-        // check if the whole queue fits into one ride
-        if (currPos + 1 === g.length && !isRideFilled) {
-          this.StartTotal = BigInt(ridesCount) * currSum;
-          this.Head = null;
-          return;
-        }
-        currPos = (currPos + 1) % g.length;
-        currEl = BigInt(g[currPos]);
-      }
-
-      const newNode = new QueueNode(currGroupPos, currSum);
-      currGroupPos = currPos;
-      isRideFilled = true;
-      currNode.append(newNode);
-      currNode = newNode;
-      this.Length++;
-      this.Total += currSum;
-      if (this.Length === ridesCount) {
-        break;
-      }
-      if (currEl > placesCount) {
-        break;
-      }
-    }
-
-    cycleStart = currGroupPos;
-    currNode = this.Head.next;
-
-    while (currNode !== null && currNode.pos !== cycleStart) {
-      this.StartTotal += currNode.sum;
-      this.StartLength++;
-      currNode = currNode.next;
-    }
-    this.Length -= this.StartLength;
-    this.Total -= this.StartTotal;
-
-    this.Head = currNode;
-  }
-
-  countPartialSum(length: number): bigint {
-    let currNode: QueueNode | null = this.Head;
-    let sum = BigInt(0);
-    while (currNode !== null && length > 0) {
-      sum += currNode.sum;
-      currNode = currNode.next;
-      length--;
-    }
-    return sum;
+  constructor(idx: number, sum: bigint) {
+    this.idx = idx;
+    this.sum = sum;
   }
 }
 
-class QueueNode {
-  sum: bigint;
-  pos: number;
-  next: QueueNode | null;
-
-  constructor(pos: number, sum: bigint) {
-    this.pos = pos;
-    this.sum = sum;
-    this.next = null;
+class EarningsCalculator {
+  static Calculate(groups: number[], placesCount: number, ridesCount: number) {
+    const rides: RideSum[] = [];
+    const ridesLedger = new Set<number>();
+    let currGroupIdx = 0;
+    while (!ridesLedger.has(currGroupIdx)) {
+      const { rideSum, newGroupIdx, isBlocking } =
+        EarningsCalculator.launchRide(groups, currGroupIdx, placesCount);
+      if (isBlocking) {
+        return rides.map((r) => r.sum).reduce((prev, curr) => prev + curr);
+      }
+      currGroupIdx = newGroupIdx;
+      rides.push(rideSum);
+      ridesLedger.add(rideSum.idx);
+    }
+    return EarningsCalculator.calculateTotalSum(
+      rides,
+      currGroupIdx,
+      ridesCount
+    );
   }
 
-  append(node: QueueNode) {
-    this.next = node;
+  private static launchRide(
+    groups: number[],
+    startGroupIdx: number,
+    placesCount: number
+  ): { rideSum: RideSum; newGroupIdx: number; isBlocking: boolean } {
+    let passangersCount = BigInt(groups[startGroupIdx]);
+    if (passangersCount > placesCount) {
+      return {
+        rideSum: new RideSum(-1, BigInt(0)),
+        newGroupIdx: -1,
+        isBlocking: true,
+      };
+    }
+
+    const getNewCurrIdx = (currIdx: number) => (currIdx + 1) % groups.length;
+    let currIdx = getNewCurrIdx(startGroupIdx);
+    while (currIdx != startGroupIdx) {
+      const groupsPassengers = BigInt(groups[currIdx]);
+      if (passangersCount + groupsPassengers > BigInt(placesCount)) {
+        break;
+      }
+      passangersCount += groupsPassengers;
+      currIdx = getNewCurrIdx(currIdx);
+    }
+    return {
+      rideSum: new RideSum(startGroupIdx, passangersCount),
+      newGroupIdx: currIdx,
+      isBlocking: false,
+    };
+  }
+
+  private static calculateTotalSum(
+    rides: RideSum[],
+    cycleStartGroupIdx: number,
+    ridesCount: number
+  ): bigint {
+    let cycleStart = -1;
+    let startTotal = BigInt(0);
+    for (let i = 0; i < rides.length; i++) {
+      if (rides[i].idx === cycleStartGroupIdx) {
+        cycleStart = i;
+        break;
+      }
+      ridesCount--;
+      startTotal += rides[i].sum;
+    }
+    if (cycleStart === -1) {
+      throw new Error(
+        `group ${cycleStartGroupIdx} that starts the cycle has not been found`
+      );
+    }
+
+    let cycleLength = rides.length - cycleStart;
+    let residueLen = ridesCount % cycleLength;
+    let residueStopIdx = cycleStart + residueLen;
+    let cycleTotal = BigInt(0);
+    let ridesResidueTotal = BigInt(0);
+    for (let i = cycleStart; i < rides.length; i++) {
+      cycleTotal += rides[i].sum;
+      if (i < residueStopIdx) {
+        ridesResidueTotal += rides[i].sum;
+      }
+    }
+
+    return (
+      startTotal +
+      BigInt(Math.floor(ridesCount / cycleLength)) * cycleTotal +
+      ridesResidueTotal
+    );
   }
 }
