@@ -1,0 +1,6 @@
+# ignore all files
+/*
+# except for files in src/
+!src/
+# but then ignore *.js
+src/**/*.js
